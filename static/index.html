@@ -1,0 +1,110 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="theme-color" content="#102b40">
+    <title>Sistema Avanzado de Figuras 3D</title>
+    <link rel="stylesheet" href="/styles.css">
+  </head>
+  <body>
+    <header class="topbar">
+      <a class="brand" href="/" aria-label="Inicio">
+        <span class="brand-mark" aria-hidden="true"><i></i><i></i><i></i></span>
+        <span>GEOMETRÍA <b>· LAB</b></span>
+      </a>
+      <span class="topbar-note"><span class="status-dot"></span> Laboratorio de volumen y superficie</span>
+    </header>
+
+    <main class="workspace">
+      <section class="page-heading">
+        <div>
+          <p class="eyebrow">MODELADO ESPACIAL / 01</p>
+          <h1>Sistema avanzado<br><span>de figuras 3D</span></h1>
+        </div>
+        <p class="heading-note">Construye sólidos, explora sus medidas<br>y compara el efecto de la escala.</p>
+      </section>
+
+      <section class="workbench" aria-label="Calculadora de figuras">
+        <aside class="controls-column">
+          <section class="panel add-panel">
+            <div class="section-heading">
+              <span class="step-number">01</span>
+              <div><h2>Crear figura</h2><p>Define el sólido y sus dimensiones.</p></div>
+            </div>
+            <form id="figure-form" novalidate>
+              <label class="field-label" for="figure-type">Tipo de figura</label>
+              <select id="figure-type" name="tipo">
+                <option value="Cubo">Cubo</option>
+                <option value="Esfera">Esfera</option>
+                <option value="Cilindro">Cilindro</option>
+              </select>
+              <div id="dimension-fields" class="dimension-fields"></div>
+              <button class="button button-primary" type="submit"><span aria-hidden="true">＋</span> Agregar figura</button>
+            </form>
+            <p id="form-message" class="message" role="status" aria-live="polite"></p>
+          </section>
+
+          <section class="panel collection-panel">
+            <div class="section-heading compact-heading">
+              <span class="step-number">02</span>
+              <div><h2>Tu colección <span id="figure-count" class="count">0</span></h2><p>Selecciona una para ver su forma.</p></div>
+            </div>
+            <ul id="figure-list" class="figure-list"></ul>
+            <div id="empty-list" class="empty-state" hidden>Aún no hay figuras en la colección.</div>
+          </section>
+        </aside>
+
+        <div class="results-column">
+          <section class="panel scale-panel">
+            <div class="section-heading compact-heading">
+              <span class="step-number">03</span>
+              <div><h2>Factor de escala</h2><p>Las dimensiones originales se mantienen intactas.</p></div>
+            </div>
+            <div class="scale-controls">
+              <div class="scale-presets" role="group" aria-label="Factores de escala frecuentes">
+                <button type="button" class="scale-chip" data-factor="0.5">× 0.5</button>
+                <button type="button" class="scale-chip active" data-factor="1">× 1</button>
+                <button type="button" class="scale-chip" data-factor="1.5">× 1.5</button>
+                <button type="button" class="scale-chip" data-factor="2">× 2</button>
+              </div>
+              <label class="custom-scale-label" for="scale-factor">Otro</label>
+              <input id="scale-factor" type="number" min="0" step="any" value="1" inputmode="decimal" aria-label="Factor de escala personalizado">
+              <button id="calculate-button" class="button button-dark" type="button"><span aria-hidden="true">↗</span> Calcular</button>
+            </div>
+            <p id="scale-message" class="message" role="status" aria-live="polite"></p>
+          </section>
+
+          <section class="panel results-panel">
+            <div class="results-heading">
+              <div class="section-heading compact-heading">
+                <span class="step-number">04</span>
+                <div><h2>Comparativa de resultados</h2><p id="results-subtitle">Área y volumen, antes y después de escalar.</p></div>
+              </div>
+              <button id="clear-button" class="button button-quiet" type="button" title="Limpiar colección y resultados"><span aria-hidden="true">⌫</span> Limpiar</button>
+            </div>
+            <div class="table-wrap">
+              <table>
+                <thead><tr><th>Figura</th><th>Dimensiones</th><th>Área original</th><th>Volumen original</th><th>Área escalada</th><th>Volumen escalado</th></tr></thead>
+                <tbody id="results-body"></tbody>
+              </table>
+              <div id="empty-results" class="empty-results" hidden>Agrega una figura para comenzar el análisis.</div>
+            </div>
+          </section>
+
+          <section class="panel preview-panel">
+            <div class="preview-copy">
+              <p class="eyebrow">VISTA GEOMÉTRICA</p>
+              <h2 id="preview-title">Selecciona una figura</h2>
+              <p id="preview-description">La representación se actualiza al elegir un sólido de la colección.</p>
+            </div>
+            <div class="canvas-wrap"><canvas id="shape-canvas" aria-label="Representación gráfica de la figura seleccionada"></canvas></div>
+            <div class="axis-label" aria-hidden="true"><span>X</span><span>Y</span><span>Z</span></div>
+          </section>
+        </div>
+      </section>
+      <footer class="page-footer"><span>GEOMETRÍA · LAB</span><span>Área ∝ s² <i></i> Volumen ∝ s³</span></footer>
+    </main>
+    <script src="/app.js" defer></script>
+  </body>
+</html>
