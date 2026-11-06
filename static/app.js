@@ -1,121 +1,26 @@
-const form = document.querySelector('#figure-form');
-const typeSelect = document.querySelector('#figure-type');
-const dimensionFields = document.querySelector('#dimension-fields');
-const figureList = document.querySelector('#figure-list');
-const figureCount = document.querySelector('#figure-count');
-const resultsBody = document.querySelector('#results-body');
-const scaleInput = document.querySelector('#scale-factor');
-const formMessage = document.querySelector('#form-message');
-const scaleMessage = document.querySelector('#scale-message');
-const emptyList = document.querySelector('#empty-list');
-const emptyResults = document.querySelector('#empty-results');
-const canvas = document.querySelector('#shape-canvas');
-const context = canvas.getContext('2d');
-
-const dimensionNames = {
-  Cubo: [['lado', 'Lado']],
-  Esfera: [['radio', 'Radio']],
-  Cilindro: [['radio', 'Radio'], ['altura', 'Altura']],
-};
-const shapeIcons = { Cubo: '◇', Esfera: '◉', Cilindro: '▤' };
 let figures = [];
-let selectedIndex = -1;
+let history = [];
+let selectedIndex = 0;
+let currentFactor = 1;
+let comparisonRevision = 0;
+let stage;
 
-function showMessage(element, message = '') {
-  element.textContent = message;
-}
-
-function renderDimensionFields() {
-  dimensionFields.replaceChildren();
-  for (const [key, label] of dimensionNames[typeSelect.value]) {
-    const wrapper = document.createElement('div');
-    wrapper.className = 'dimension-field';
-    const fieldLabel = document.createElement('label');
-    fieldLabel.htmlFor = `dimension-${key}`;
-    fieldLabel.textContent = label;
-    const input = document.createElement('input');
-    input.className = 'dimension-input';
-    input.id = `dimension-${key}`;
-    input.name = key;
-    input.type = 'number';
-    input.min = '0';
-    input.step = 'any';
-    input.required = true;
-    input.inputMode = 'decimal';
-    input.placeholder = 'Mayor que 0';
-    wrapper.append(fieldLabel, input);
-    dimensionFields.append(wrapper);
-  }
-}
+const visualPanel = document.querySelector('#visual-panel');
+const figureList = document.querySelector('#figure-list');
+const figureSelects = ['#figure-select', '#calculator-select', '#scale-select'].map((selector) => document.querySelector(selector));
+const figureSymbols = { Cubo: '⬡', Esfera: '◉', Cilindro: '▤' };
+const numberFormat = new Intl.NumberFormat('es-ES', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
 function formatNumber(value) {
-  return new Intl.NumberFormat('es-ES', { maximumFractionDigits: 4 }).format(value);
+  return numberFormat.format(value);
 }
 
 function formatDimensions(dimensions) {
-  return Object.entries(dimensions).map(([name, value]) => `${name} ${formatNumber(value)}`).join(' · ');
+  return Object.entries(dimensions).map(([name, value]) => `${name} ${formatNumber(value)} u`).join(' · ');
 }
 
-function selectFigure(index) {
-  selectedIndex = index;
-  renderFigureList();
-  drawSelectedFigure();
-}
-
-function renderFigureList() {
-  figureList.replaceChildren();
-  figureCount.textContent = String(figures.length);
-  emptyList.hidden = figures.length > 0;
-  figures.forEach((figure, index) => {
-    const item = document.createElement('li');
-    const button = document.createElement('button');
-    button.type = 'button';
-    button.className = `figure-item${index === selectedIndex ? ' selected' : ''}`;
-    button.setAttribute('aria-pressed', String(index === selectedIndex));
-    const icon = document.createElement('span');
-    icon.className = 'figure-icon';
-    icon.setAttribute('aria-hidden', 'true');
-    icon.textContent = shapeIcons[figure.tipo];
-    const details = document.createElement('span');
-    const name = document.createElement('strong');
-    name.textContent = figure.nombre;
-    const dimensions = document.createElement('small');
-    dimensions.textContent = formatDimensions(figure.dimensiones);
-    details.append(name, dimensions);
-    const chevron = document.createElement('span');
-    chevron.className = 'chevron';
-    chevron.setAttribute('aria-hidden', 'true');
-    chevron.textContent = '›';
-    button.append(icon, details, chevron);
-    button.addEventListener('click', () => selectFigure(index));
-    item.append(button);
-    figureList.append(item);
-  });
-}
-
-function renderResults(results, factor) {
-  resultsBody.replaceChildren();
-  emptyResults.hidden = results.length > 0;
-  for (const result of results) {
-    const row = document.createElement('tr');
-    const values = [
-      result.nombre,
-      formatDimensions(result.dimensiones),
-      formatNumber(result.area_original),
-      formatNumber(result.volumen_original),
-      formatNumber(result.area_escalada),
-      formatNumber(result.volumen_escalado),
-    ];
-    for (const value of values) {
-      const cell = document.createElement('td');
-      cell.textContent = value;
-      row.append(cell);
-    }
-    resultsBody.append(row);
-  }
-  document.querySelector('#results-subtitle').textContent = results.length
-    ? `Comparación con factor × ${formatNumber(factor)}.`
-    : 'Área y volumen, antes y después de escalar.';
+function setMessage(element, message = '') {
+  element.textContent = message;
 }
 
 async function requestJson(path, options = {}) {
@@ -125,171 +30,360 @@ async function requestJson(path, options = {}) {
   return data;
 }
 
-async function refreshFigures() {
+async function postJson(path, data) {
+  return requestJson(path, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(data),
+  });
+}
+
+function switchView(name) {
+  document.querySelectorAll('.view').forEach((view) => {
+    view.hidden = view.dataset.view !== name;
+    view.classList.toggle('active', !view.hidden);
+  });
+  document.querySelectorAll('.nav-link').forEach((button) => {
+    const active = button.dataset.viewTarget === name;
+    button.classList.toggle('active', active);
+    if (active) button.setAttribute('aria-current', 'page');
+    else button.removeAttribute('aria-current');
+  });
+  const slot = document.querySelector(`#${name}-stage-slot`) || document.querySelector('#home-stage-slot');
+  slot.append(visualPanel);
+  stage?.resize();
+  document.querySelector('#sidebar').classList.remove('open');
+  document.querySelector('#mobile-nav-toggle').setAttribute('aria-expanded', 'false');
+  document.querySelector('.main-content').scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+function renderFigureSelectors() {
+  for (const select of figureSelects) {
+    select.replaceChildren();
+    if (!figures.length) {
+      const option = document.createElement('option');
+      option.value = '';
+      option.textContent = 'No hay figuras en la colección';
+      select.append(option);
+      select.disabled = true;
+      continue;
+    }
+    select.disabled = false;
+    figures.forEach((figure, index) => {
+      const option = document.createElement('option');
+      option.value = String(index);
+      option.textContent = `${figure.nombre} · ${formatDimensions(figure.dimensiones)}`;
+      option.selected = index === selectedIndex;
+      select.append(option);
+    });
+  }
+}
+
+function renderFigureList() {
+  figureList.replaceChildren();
+  document.querySelector('#figure-count').textContent = String(figures.length);
+  document.querySelector('#figure-list-empty').hidden = figures.length > 0;
+  figures.forEach((figure, index) => {
+    const item = document.createElement('li');
+    const button = document.createElement('button');
+    button.className = `figure-choice${index === selectedIndex ? ' active' : ''}`;
+    button.type = 'button';
+    button.setAttribute('aria-pressed', String(index === selectedIndex));
+    const icon = document.createElement('span');
+    icon.className = 'figure-choice-icon';
+    icon.setAttribute('aria-hidden', 'true');
+    icon.textContent = figureSymbols[figure.tipo];
+    const text = document.createElement('span');
+    const name = document.createElement('b');
+    name.textContent = figure.nombre;
+    const dimensions = document.createElement('small');
+    dimensions.textContent = formatDimensions(figure.dimensiones);
+    text.append(name, dimensions);
+    const arrow = document.createElement('span');
+    arrow.setAttribute('aria-hidden', 'true');
+    arrow.textContent = '›';
+    button.append(icon, text, arrow);
+    button.addEventListener('click', () => selectFigure(index));
+    item.append(button);
+    figureList.append(item);
+  });
+  document.querySelector('#metric-figures').textContent = String(figures.length);
+  renderFigureSelectors();
+}
+
+function selectFigure(index) {
+  if (!Number.isInteger(index) || index < 0 || index >= figures.length) return;
+  selectedIndex = index;
+  renderFigureList();
+  updateStage();
+  updateScaleComparison();
+}
+
+function updateStage() {
+  const figure = figures[selectedIndex];
+  const title = document.querySelector('#stage-title');
+  const description = document.querySelector('#stage-dimensions');
+  const factor = document.querySelector('#stage-factor');
+  if (!figure) {
+    title.textContent = 'Sin figura seleccionada';
+    description.textContent = 'Agrega un sólido para mostrarlo en 3D.';
+    stage?.setFigure(null, currentFactor);
+    return;
+  }
+  title.textContent = figure.nombre;
+  description.textContent = formatDimensions(figure.dimensiones);
+  factor.textContent = `× ${formatNumber(currentFactor)}`;
+  stage?.setFigure(figure, currentFactor);
+}
+
+async function loadFigures() {
   const data = await requestJson('/api/figuras');
   figures = data.figuras;
   if (selectedIndex >= figures.length) selectedIndex = figures.length - 1;
   if (figures.length && selectedIndex < 0) selectedIndex = 0;
   renderFigureList();
-  drawSelectedFigure();
+  updateStage();
+  await updateScaleComparison();
 }
 
-async function calculate() {
-  showMessage(scaleMessage);
-  const factor = Number(scaleInput.value);
-  if (scaleInput.value.trim() === '' || !Number.isFinite(factor) || factor < 0) {
-    showMessage(scaleMessage, 'Ingresa un factor de escala igual o mayor que cero.');
-    scaleInput.focus();
-    return;
-  }
-  try {
-    const data = await requestJson(`/api/resultados?factor=${encodeURIComponent(factor)}`);
-    renderResults(data.resultados, factor);
-  } catch (error) {
-    showMessage(scaleMessage, error.message);
-  }
+function createResultMarkup(result, scaled = true) {
+  const area = scaled ? result.area_escalada : result.area_original;
+  const volume = scaled ? result.volumen_escalado : result.volumen_original;
+  const factorText = scaled ? `Factor × ${formatNumber(result.factor)}` : 'Dimensiones originales';
+  return `<div><span>ÁREA SUPERFICIAL</span><strong>${formatNumber(area)} u²</strong></div><div><span>VOLUMEN</span><strong>${formatNumber(volume)} u³</strong></div><div><span>${factorText}</span><strong>${result.nombre}</strong></div><div><span>DIMENSIONES</span><strong>${formatDimensions(result.dimensiones)}</strong></div>`;
 }
 
-function drawGrid(width, height) {
-  context.clearRect(0, 0, width, height);
-  context.strokeStyle = '#e5edef';
-  context.lineWidth = 1;
-  for (let x = 12; x < width; x += 24) {
-    context.beginPath(); context.moveTo(x, 0); context.lineTo(x, height); context.stroke();
-  }
-  for (let y = 12; y < height; y += 24) {
-    context.beginPath(); context.moveTo(0, y); context.lineTo(width, y); context.stroke();
-  }
+function renderCalculatorResult(result) {
+  const target = document.querySelector('#calculator-result');
+  target.replaceChildren();
+  const eyebrow = document.createElement('p');
+  eyebrow.className = 'eyebrow';
+  eyebrow.textContent = 'RESULTADO CALCULADO EN PYTHON';
+  const title = document.createElement('h3');
+  title.textContent = result.nombre;
+  const dimensions = document.createElement('p');
+  dimensions.textContent = formatDimensions(result.dimensiones);
+  const values = document.createElement('div');
+  values.className = 'result-pair';
+  values.innerHTML = `<div><span>Área superficial</span><strong>${formatNumber(result.area_escalada)} u²</strong><small>factor × ${formatNumber(result.factor)}</small></div><div><span>Volumen</span><strong>${formatNumber(result.volumen_escalado)} u³</strong><small>factor × ${formatNumber(result.factor)}</small></div>`;
+  target.append(eyebrow, title, dimensions, values);
 }
 
-function drawSelectedFigure() {
-  const bounds = canvas.getBoundingClientRect();
-  const ratio = window.devicePixelRatio || 1;
-  canvas.width = Math.max(1, Math.round(bounds.width * ratio));
-  canvas.height = Math.max(1, Math.round(bounds.height * ratio));
-  context.setTransform(ratio, 0, 0, ratio, 0, 0);
-  drawGrid(bounds.width, bounds.height);
-  const figure = figures[selectedIndex];
-  const title = document.querySelector('#preview-title');
-  const description = document.querySelector('#preview-description');
-  if (!figure) {
-    title.textContent = 'Selecciona una figura';
-    description.textContent = 'La representación se actualiza al elegir un sólido de la colección.';
-    return;
-  }
-  title.textContent = figure.nombre;
-  description.textContent = `${formatDimensions(figure.dimensiones)} · escala visual original`;
-  const width = bounds.width;
-  const height = bounds.height;
-  const scale = Math.min(width / 250, height / 150, 1.2);
-  context.save();
-  context.translate(width / 2, height / 2 + 5);
-  context.scale(scale, scale);
-  if (figure.tipo === 'Cubo') drawCube();
-  else if (figure.tipo === 'Esfera') drawSphere();
-  else drawCylinder();
-  context.restore();
+function renderFigureResult(result, form) {
+  const output = document.querySelector('#figure-result');
+  output.innerHTML = createResultMarkup(result);
+  output.hidden = false;
+  const feedback = form.querySelector('.form-feedback');
+  feedback.textContent = `${result.nombre} agregado a la colección.`;
 }
 
-function drawCube() {
-  const a = [-45, -35], b = [0, -61], c = [45, -35], d = [0, -9];
-  const e = [-45, 18], f = [0, 44], g = [45, 18];
-  context.lineWidth = 2;
-  context.strokeStyle = '#176f80';
-  context.fillStyle = '#c9f0e2';
-  context.beginPath(); context.moveTo(...a); context.lineTo(...b); context.lineTo(...c); context.lineTo(...d); context.closePath(); context.fill(); context.stroke();
-  context.fillStyle = '#84d8dd';
-  context.beginPath(); context.moveTo(...a); context.lineTo(...d); context.lineTo(...f); context.lineTo(...e); context.closePath(); context.fill(); context.stroke();
-  context.fillStyle = '#5ab7c4';
-  context.beginPath(); context.moveTo(...d); context.lineTo(...c); context.lineTo(...g); context.lineTo(...f); context.closePath(); context.fill(); context.stroke();
+async function calculateFigure(index, factor = 1) {
+  const data = await postJson('/api/calcular', { indice: index, factor });
+  await loadHistory();
+  return data.resultado;
 }
 
-function drawSphere() {
-  const gradient = context.createRadialGradient(-20, -32, 5, 12, 4, 69);
-  gradient.addColorStop(0, '#e1faf0'); gradient.addColorStop(.58, '#81d9dc'); gradient.addColorStop(1, '#278b9b');
-  context.fillStyle = gradient;
-  context.strokeStyle = '#176f80';
-  context.lineWidth = 2;
-  context.beginPath(); context.arc(0, 0, 58, 0, Math.PI * 2); context.fill(); context.stroke();
-  context.strokeStyle = 'rgba(18, 75, 96, .55)';
-  context.beginPath(); context.ellipse(0, 0, 58, 20, 0, 0, Math.PI * 2); context.stroke();
-  context.beginPath(); context.ellipse(0, 0, 22, 58, 0, 0, Math.PI * 2); context.stroke();
+async function loadHistory() {
+  const data = await requestJson('/api/historial');
+  history = data.historial;
+  renderHistory();
 }
 
-function drawCylinder() {
-  context.lineWidth = 2;
-  context.strokeStyle = '#176f80';
-  context.fillStyle = '#65c4cc';
-  context.fillRect(-51, -34, 102, 68);
-  context.beginPath();
-  context.moveTo(-51, -34); context.lineTo(-51, 34);
-  context.moveTo(51, -34); context.lineTo(51, 34);
-  context.stroke();
-  context.fillStyle = '#c9f0e2';
-  context.beginPath(); context.ellipse(0, 34, 51, 19, 0, 0, Math.PI * 2); context.fill(); context.stroke();
-  context.fillStyle = '#95dfe0';
-  context.beginPath(); context.ellipse(0, -34, 51, 19, 0, 0, Math.PI * 2); context.fill(); context.stroke();
-}
-
-form.addEventListener('submit', async (event) => {
-  event.preventDefault();
-  showMessage(formMessage);
-  const dimensions = {};
-  for (const input of dimensionFields.querySelectorAll('input')) {
-    const value = Number(input.value);
-    if (input.value.trim() === '' || !Number.isFinite(value) || value <= 0) {
-      showMessage(formMessage, `La dimensión «${input.name}» debe ser mayor que cero.`);
-      input.focus();
-      return;
+function renderHistory() {
+  const body = document.querySelector('#history-body');
+  body.replaceChildren();
+  document.querySelector('#history-empty').hidden = history.length > 0;
+  document.querySelector('#nav-history-count').textContent = String(history.length);
+  document.querySelector('#metric-calculations').textContent = String(history.length);
+  const rows = history.slice(0, 6);
+  document.querySelector('#home-history-empty').hidden = rows.length > 0;
+  const homeBody = document.querySelector('#home-history-body');
+  homeBody.replaceChildren();
+  for (const [index, item] of history.entries()) {
+    const row = document.createElement('tr');
+    const values = [new Date(item.fecha).toLocaleString('es-ES'), item.tipo, formatDimensions(item.dimensiones), `× ${formatNumber(item.factor)}`, `${formatNumber(item.area_superficial)} u²`, `${formatNumber(item.volumen)} u³`];
+    for (const value of values) {
+      const cell = document.createElement('td');
+      cell.textContent = value;
+      row.append(cell);
     }
-    dimensions[input.name] = value;
+    body.append(row);
+    if (index < 6) {
+      const homeRow = document.createElement('tr');
+      for (const value of [item.tipo, formatDimensions(item.dimensiones), `${formatNumber(item.area_superficial)} u²`, `${formatNumber(item.volumen)} u³`, `× ${formatNumber(item.factor)}`]) {
+        const cell = document.createElement('td');
+        cell.textContent = value;
+        homeRow.append(cell);
+      }
+      homeBody.append(homeRow);
+    }
+  }
+}
+
+function readFactor() {
+  const value = Number(document.querySelector('#scale-number').value);
+  if (!Number.isFinite(value) || value <= 0) throw new Error('El factor debe ser un número mayor que cero.');
+  return value;
+}
+
+function setFactor(value) {
+  currentFactor = Number(value);
+  document.querySelector('#scale-range').value = String(Math.min(3, Math.max(.1, currentFactor)));
+  document.querySelector('#scale-number').value = String(currentFactor);
+  document.querySelector('#scale-value').textContent = `× ${formatNumber(currentFactor)}`;
+  document.querySelector('#scale-tag').textContent = `× ${formatNumber(currentFactor)}`;
+  document.querySelector('#metric-factor').textContent = `× ${formatNumber(currentFactor)}`;
+  document.querySelectorAll('[data-scale-preset]').forEach((button) => button.classList.toggle('selected', Number(button.dataset.scalePreset) === currentFactor));
+  updateStage();
+}
+
+async function updateScaleComparison() {
+  const revision = ++comparisonRevision;
+  const figure = figures[selectedIndex];
+  const fields = ['#scale-figure-name', '#dimensions-original', '#dimensions-scaled', '#area-original', '#area-scaled', '#volume-original', '#volume-scaled'];
+  if (!figure) {
+    document.querySelector('#scale-figure-name').textContent = 'Selecciona una figura';
+    for (const selector of fields.slice(1)) document.querySelector(selector).textContent = '—';
+    return;
   }
   try {
-    const result = await requestJson('/api/figuras', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ tipo: typeSelect.value, dimensiones: dimensions }),
-    });
-    await refreshFigures();
-    selectFigure(result.indice);
-    await calculate();
-    for (const input of dimensionFields.querySelectorAll('input')) input.value = '';
+    const data = await requestJson(`/api/resultados?factor=${encodeURIComponent(currentFactor)}`);
+    if (revision !== comparisonRevision) return;
+    const result = data.resultados[selectedIndex];
+    if (!result) return;
+    document.querySelector('#scale-figure-name').textContent = result.nombre;
+    document.querySelector('#dimensions-original').textContent = formatDimensions(result.dimensiones);
+    document.querySelector('#dimensions-scaled').textContent = formatDimensions(result.dimensiones_escaladas);
+    document.querySelector('#area-original').textContent = `${formatNumber(result.area_original)} u²`;
+    document.querySelector('#area-scaled').textContent = `${formatNumber(result.area_escalada)} u²`;
+    document.querySelector('#volume-original').textContent = `${formatNumber(result.volumen_original)} u³`;
+    document.querySelector('#volume-scaled').textContent = `${formatNumber(result.volumen_escalado)} u³`;
   } catch (error) {
-    showMessage(formMessage, error.message);
+    setMessage(document.querySelector('#scale-error'), error.message);
+  }
+}
+
+async function initializeThree() {
+  const host = document.querySelector('#three-container');
+  try {
+    const { createThreeStage } = await import('./three-stage.js');
+    stage = createThreeStage(host);
+    document.querySelector('#reset-camera').addEventListener('click', () => stage.resetCamera());
+  } catch (error) {
+    const fallback = document.createElement('div');
+    fallback.className = 'three-loading';
+    fallback.textContent = 'No se pudo iniciar WebGL. Verifica la conexión a Three.js y el soporte gráfico del navegador.';
+    host.replaceChildren(fallback);
+  }
+}
+
+document.querySelectorAll('[data-view-target]').forEach((button) => {
+  button.addEventListener('click', () => switchView(button.dataset.viewTarget));
+});
+document.querySelector('#mobile-nav-toggle').addEventListener('click', (event) => {
+  const sidebar = document.querySelector('#sidebar');
+  const open = sidebar.classList.toggle('open');
+  event.currentTarget.setAttribute('aria-expanded', String(open));
+});
+
+for (const form of document.querySelectorAll('[data-shape-form]')) {
+  form.addEventListener('submit', async (event) => {
+    event.preventDefault();
+    const feedback = form.querySelector('.form-feedback');
+    setMessage(feedback);
+    const dimensions = {};
+    for (const input of form.querySelectorAll('input')) {
+      const value = Number(input.value);
+      if (input.value.trim() === '' || !Number.isFinite(value) || value <= 0) {
+        setMessage(feedback, `La dimensión «${input.name}» debe ser un número mayor que cero.`);
+        input.focus();
+        return;
+      }
+      dimensions[input.name] = value;
+    }
+    try {
+      const data = await postJson('/api/figuras', { tipo: form.dataset.shapeForm, dimensiones: dimensions });
+      await loadFigures();
+      selectFigure(data.indice);
+      const result = await calculateFigure(data.indice, 1);
+      renderFigureResult(result, form);
+      switchView('figures');
+    } catch (error) {
+      setMessage(feedback, error.message);
+    }
+  });
+}
+
+for (const select of figureSelects) {
+  select.addEventListener('change', () => {
+    const index = Number(select.value);
+    if (Number.isInteger(index)) selectFigure(index);
+  });
+}
+
+document.querySelector('#calculate-selected').addEventListener('click', async () => {
+  try {
+    const result = await calculateFigure(selectedIndex, 1);
+    renderCalculatorResult(result);
+    setMessage(document.querySelector('#calculator-error'));
+  } catch (error) {
+    setMessage(document.querySelector('#calculator-error'), error.message);
   }
 });
 
-typeSelect.addEventListener('change', renderDimensionFields);
-document.querySelector('#calculate-button').addEventListener('click', calculate);
-document.querySelectorAll('.scale-chip').forEach((button) => {
+document.querySelector('#scale-range').addEventListener('input', (event) => {
+  setFactor(event.currentTarget.value);
+  setMessage(document.querySelector('#scale-error'));
+  updateScaleComparison();
+});
+document.querySelector('#scale-number').addEventListener('input', (event) => {
+  const value = Number(event.currentTarget.value);
+  if (event.currentTarget.value === '' || !Number.isFinite(value) || value <= 0) {
+    setMessage(document.querySelector('#scale-error'), 'El factor debe ser un número mayor que cero.');
+    return;
+  }
+  setFactor(value);
+  setMessage(document.querySelector('#scale-error'));
+  updateScaleComparison();
+});
+document.querySelectorAll('[data-scale-preset]').forEach((button) => {
   button.addEventListener('click', () => {
-    scaleInput.value = button.dataset.factor;
-    document.querySelectorAll('.scale-chip').forEach((chip) => chip.classList.toggle('active', chip === button));
-    calculate();
+    setFactor(button.dataset.scalePreset);
+    setMessage(document.querySelector('#scale-error'));
+    updateScaleComparison();
   });
 });
-scaleInput.addEventListener('input', () => {
-  document.querySelectorAll('.scale-chip').forEach((chip) => chip.classList.toggle('active', chip.dataset.factor === scaleInput.value));
-});
-document.querySelector('#clear-button').addEventListener('click', async () => {
+document.querySelector('#calculate-scale').addEventListener('click', async () => {
   try {
-    await requestJson('/api/figuras', { method: 'DELETE' });
-    figures = [];
-    selectedIndex = -1;
-    form.reset();
-    renderDimensionFields();
-    scaleInput.value = '1';
-    document.querySelectorAll('.scale-chip').forEach((chip) => chip.classList.toggle('active', chip.dataset.factor === '1'));
-    renderFigureList();
-    renderResults([], 1);
-    drawSelectedFigure();
-    showMessage(formMessage);
-    showMessage(scaleMessage);
+    const factor = readFactor();
+    const result = await calculateFigure(selectedIndex, factor);
+    renderCalculatorResult(result);
+    await updateScaleComparison();
+    setMessage(document.querySelector('#scale-error'));
   } catch (error) {
-    showMessage(scaleMessage, error.message);
+    setMessage(document.querySelector('#scale-error'), error.message);
   }
 });
-window.addEventListener('resize', drawSelectedFigure);
 
-renderDimensionFields();
-refreshFigures().then(calculate).catch((error) => showMessage(scaleMessage, error.message));
+document.querySelector('#clear-figures').addEventListener('click', async () => {
+  try {
+    await requestJson('/api/figuras', { method: 'DELETE' });
+    selectedIndex = -1;
+    document.querySelector('#figure-result').hidden = true;
+    await loadFigures();
+  } catch (error) {
+    setMessage(document.querySelector('#global-message'), error.message);
+  }
+});
+document.querySelector('#clear-history').addEventListener('click', async () => {
+  try {
+    await requestJson('/api/historial', { method: 'DELETE' });
+    await loadHistory();
+  } catch (error) {
+    setMessage(document.querySelector('#global-message'), error.message);
+  }
+});
+
+await initializeThree();
+await Promise.all([loadFigures(), loadHistory()]);
+setFactor(1);

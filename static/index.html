@@ -6,105 +6,110 @@
     <meta name="theme-color" content="#102b40">
     <title>Sistema Avanzado de Figuras 3D</title>
     <link rel="stylesheet" href="/styles.css">
+    <script type="importmap">
+      {"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.180.0/build/three.module.js"}}
+    </script>
   </head>
   <body>
-    <header class="topbar">
-      <a class="brand" href="/" aria-label="Inicio">
-        <span class="brand-mark" aria-hidden="true"><i></i><i></i><i></i></span>
-        <span>GEOMETRÍA <b>· LAB</b></span>
-      </a>
-      <span class="topbar-note"><span class="status-dot"></span> Laboratorio de volumen y superficie</span>
-    </header>
+    <div class="app-frame">
+      <header class="mobile-header">
+        <a class="brand" href="#home" data-view-target="home"><span class="brand-mark" aria-hidden="true">3D</span><span>FIGURAS <b>· LAB</b></span></a>
+        <button id="mobile-nav-toggle" class="icon-button" type="button" aria-label="Abrir navegación" aria-expanded="false">☰</button>
+      </header>
+      <aside id="sidebar" class="sidebar">
+        <a class="brand sidebar-brand" href="#home" data-view-target="home"><span class="brand-mark" aria-hidden="true">3D</span><span>FIGURAS <b>· LAB</b></span></a>
+        <p class="nav-caption">ESPACIO DE TRABAJO</p>
+        <nav class="main-nav" aria-label="Navegación principal">
+          <button class="nav-link active" type="button" data-view-target="home"><span class="nav-icon">⌂</span><span>Inicio</span></button>
+          <button class="nav-link" type="button" data-view-target="figures"><span class="nav-icon">⬡</span><span>Figuras 3D</span></button>
+          <button class="nav-link" type="button" data-view-target="calculator"><span class="nav-icon">∑</span><span>Calculadora</span></button>
+          <button class="nav-link" type="button" data-view-target="scale"><span class="nav-icon">↗</span><span>Escalado dinámico</span></button>
+          <button class="nav-link" type="button" data-view-target="history"><span class="nav-icon">◷</span><span>Historial</span><span id="nav-history-count" class="nav-count">0</span></button>
+          <button class="nav-link" type="button" data-view-target="about"><span class="nav-icon">ⓘ</span><span>Acerca del proyecto</span></button>
+        </nav>
+        <div class="sidebar-bottom"><span class="online-dot"></span><span>Motor Python activo</span><small>Versión académica 1.0</small></div>
+      </aside>
 
-    <main class="workspace">
-      <section class="page-heading">
-        <div>
-          <p class="eyebrow">MODELADO ESPACIAL / 01</p>
-          <h1>Sistema avanzado<br><span>de figuras 3D</span></h1>
-        </div>
-        <p class="heading-note">Construye sólidos, explora sus medidas<br>y compara el efecto de la escala.</p>
-      </section>
+      <main class="main-content">
+        <header class="page-header">
+          <div>
+            <p class="eyebrow">LABORATORIO DE GEOMETRÍA ESPACIAL</p>
+            <h1>SISTEMA AVANZADO DE FIGURAS 3D</h1>
+            <p class="page-subtitle">Calcula, visualiza y transforma figuras tridimensionales mediante programación orientada a objetos</p>
+          </div>
+          <div class="server-status"><span class="online-dot"></span> API conectada</div>
+        </header>
 
-      <section class="workbench" aria-label="Calculadora de figuras">
-        <aside class="controls-column">
-          <section class="panel add-panel">
-            <div class="section-heading">
-              <span class="step-number">01</span>
-              <div><h2>Crear figura</h2><p>Define el sólido y sus dimensiones.</p></div>
-            </div>
-            <form id="figure-form" novalidate>
-              <label class="field-label" for="figure-type">Tipo de figura</label>
-              <select id="figure-type" name="tipo">
-                <option value="Cubo">Cubo</option>
-                <option value="Esfera">Esfera</option>
-                <option value="Cilindro">Cilindro</option>
-              </select>
-              <div id="dimension-fields" class="dimension-fields"></div>
-              <button class="button button-primary" type="submit"><span aria-hidden="true">＋</span> Agregar figura</button>
-            </form>
-            <p id="form-message" class="message" role="status" aria-live="polite"></p>
-          </section>
+        <div id="global-message" class="global-message" role="status" aria-live="polite"></div>
 
-          <section class="panel collection-panel">
-            <div class="section-heading compact-heading">
-              <span class="step-number">02</span>
-              <div><h2>Tu colección <span id="figure-count" class="count">0</span></h2><p>Selecciona una para ver su forma.</p></div>
-            </div>
-            <ul id="figure-list" class="figure-list"></ul>
-            <div id="empty-list" class="empty-state" hidden>Aún no hay figuras en la colección.</div>
-          </section>
-        </aside>
+        <section id="view-home" class="view active" data-view="home">
+          <div class="view-heading">
+            <div><p class="eyebrow">RESUMEN</p><h2>Centro de control</h2><p>Un vistazo a tus sólidos y cálculos recientes.</p></div>
+            <button class="button button-primary" type="button" data-view-target="figures"><span aria-hidden="true">＋</span> Nueva figura</button>
+          </div>
+          <div class="metric-grid">
+            <article class="metric"><span class="metric-icon cyan">⬡</span><div><span>Figuras en memoria</span><strong id="metric-figures">0</strong></div><small>modelos activos</small></article>
+            <article class="metric"><span class="metric-icon blue">∑</span><div><span>Cálculos realizados</span><strong id="metric-calculations">0</strong></div><small>en esta sesión</small></article>
+            <article class="metric"><span class="metric-icon green">↗</span><div><span>Factor actual</span><strong id="metric-factor">× 1</strong></div><small>escala dinámica</small></article>
+          </div>
+          <div class="home-grid">
+            <section class="recent-panel">
+              <div class="panel-heading"><div><p class="eyebrow">ACTIVIDAD</p><h3>Cálculos recientes</h3></div><button class="text-button" type="button" data-view-target="history">Ver historial <span aria-hidden="true">→</span></button></div>
+              <div class="table-scroll"><table><thead><tr><th>FIGURA</th><th>DIMENSIONES</th><th>ÁREA</th><th>VOLUMEN</th><th>FACTOR</th></tr></thead><tbody id="home-history-body"></tbody></table><div id="home-history-empty" class="empty-note" hidden>Los cálculos que realices aparecerán aquí.</div></div>
+            </section>
+            <section class="quick-panel"><p class="eyebrow">ACCESOS DIRECTOS</p><h3>¿Qué quieres explorar?</h3><button class="quick-link" type="button" data-view-target="figures"><span class="quick-icon">⬡</span><span><b>Crear una figura</b><small>Define sus dimensiones</small></span><span class="arrow">→</span></button><button class="quick-link" type="button" data-view-target="scale"><span class="quick-icon blue">↗</span><span><b>Probar una escala</b><small>Compara área y volumen</small></span><span class="arrow">→</span></button></section>
+          </div>
+          <div id="home-stage-slot" class="stage-slot">
+            <section id="visual-panel" class="visual-panel" aria-label="Modelo tridimensional interactivo">
+              <div class="visual-heading"><div><p class="eyebrow">MODELO INTERACTIVO</p><h3 id="stage-title">Cubo</h3><p id="stage-dimensions">Selecciona una figura para comenzar.</p></div><button id="reset-camera" class="camera-button" type="button" title="Restablecer cámara">↺</button></div>
+              <div id="three-container" class="three-container"><div class="three-loading">Preparando escena 3D…</div></div>
+              <div class="visual-footer"><span><i></i> Arrastra para rotar</span><span>Rueda para acercar</span><span id="stage-factor">× 1.00</span></div>
+            </section>
+          </div>
+        </section>
 
-        <div class="results-column">
-          <section class="panel scale-panel">
-            <div class="section-heading compact-heading">
-              <span class="step-number">03</span>
-              <div><h2>Factor de escala</h2><p>Las dimensiones originales se mantienen intactas.</p></div>
-            </div>
-            <div class="scale-controls">
-              <div class="scale-presets" role="group" aria-label="Factores de escala frecuentes">
-                <button type="button" class="scale-chip" data-factor="0.5">× 0.5</button>
-                <button type="button" class="scale-chip active" data-factor="1">× 1</button>
-                <button type="button" class="scale-chip" data-factor="1.5">× 1.5</button>
-                <button type="button" class="scale-chip" data-factor="2">× 2</button>
-              </div>
-              <label class="custom-scale-label" for="scale-factor">Otro</label>
-              <input id="scale-factor" type="number" min="0" step="any" value="1" inputmode="decimal" aria-label="Factor de escala personalizado">
-              <button id="calculate-button" class="button button-dark" type="button"><span aria-hidden="true">↗</span> Calcular</button>
-            </div>
-            <p id="scale-message" class="message" role="status" aria-live="polite"></p>
-          </section>
+        <section id="view-figures" class="view" data-view="figures" hidden>
+          <div class="view-heading"><div><p class="eyebrow">BIBLIOTECA DE SÓLIDOS</p><h2>Figuras 3D</h2><p>Introduce las dimensiones y añade el resultado a la colección.</p></div><span class="section-count"><b id="figure-count">0</b> modelos</span></div>
+          <div class="shape-grid">
+            <article class="shape-card cube-card"><div class="shape-card-heading"><span class="shape-symbol">⬡</span><div><h3>Cubo</h3><p>Seis caras cuadradas</p></div></div><form class="shape-form" data-shape-form="Cubo" novalidate><label for="cube-side">Lado</label><div class="input-with-unit"><input id="cube-side" name="lado" type="number" min="0" step="any" placeholder="Ej. 3" required><span>u</span></div><button class="button button-outline" type="submit">Calcular <span aria-hidden="true">→</span></button><p class="form-feedback" aria-live="polite"></p></form></article>
+            <article class="shape-card sphere-card"><div class="shape-card-heading"><span class="shape-symbol">◉</span><div><h3>Esfera</h3><p>Superficie curva cerrada</p></div></div><form class="shape-form" data-shape-form="Esfera" novalidate><label for="sphere-radius">Radio</label><div class="input-with-unit"><input id="sphere-radius" name="radio" type="number" min="0" step="any" placeholder="Ej. 2" required><span>u</span></div><button class="button button-outline" type="submit">Calcular <span aria-hidden="true">→</span></button><p class="form-feedback" aria-live="polite"></p></form></article>
+            <article class="shape-card cylinder-card"><div class="shape-card-heading"><span class="shape-symbol">▤</span><div><h3>Cilindro</h3><p>Dos bases circulares</p></div></div><form class="shape-form" data-shape-form="Cilindro" novalidate><div class="field-row"><div><label for="cylinder-radius">Radio</label><div class="input-with-unit"><input id="cylinder-radius" name="radio" type="number" min="0" step="any" placeholder="Ej. 1.5" required><span>u</span></div></div><div><label for="cylinder-height">Altura</label><div class="input-with-unit"><input id="cylinder-height" name="altura" type="number" min="0" step="any" placeholder="Ej. 4" required><span>u</span></div></div></div><button class="button button-outline" type="submit">Calcular <span aria-hidden="true">→</span></button><p class="form-feedback" aria-live="polite"></p></form></article>
+          </div>
+          <div class="figure-lower-grid">
+            <section class="collection-panel"><div class="panel-heading"><div><p class="eyebrow">OBJETOS POLIMÓRFICOS</p><h3>Tu colección</h3></div><button id="clear-figures" class="button button-subtle" type="button" title="Eliminar todas las figuras">Limpiar</button></div><label class="select-label" for="figure-select">Figura seleccionada</label><select id="figure-select" class="select-control"></select><ul id="figure-list" class="figure-list"></ul><div id="figure-list-empty" class="empty-note" hidden>No hay modelos todavía. Calcula una figura para empezar.</div></section>
+            <div id="figures-stage-slot" class="stage-slot"></div>
+          </div>
+          <section id="figure-result" class="result-strip" hidden></section>
+        </section>
 
-          <section class="panel results-panel">
-            <div class="results-heading">
-              <div class="section-heading compact-heading">
-                <span class="step-number">04</span>
-                <div><h2>Comparativa de resultados</h2><p id="results-subtitle">Área y volumen, antes y después de escalar.</p></div>
-              </div>
-              <button id="clear-button" class="button button-quiet" type="button" title="Limpiar colección y resultados"><span aria-hidden="true">⌫</span> Limpiar</button>
-            </div>
-            <div class="table-wrap">
-              <table>
-                <thead><tr><th>Figura</th><th>Dimensiones</th><th>Área original</th><th>Volumen original</th><th>Área escalada</th><th>Volumen escalado</th></tr></thead>
-                <tbody id="results-body"></tbody>
-              </table>
-              <div id="empty-results" class="empty-results" hidden>Agrega una figura para comenzar el análisis.</div>
-            </div>
-          </section>
+        <section id="view-calculator" class="view" data-view="calculator" hidden>
+          <div class="view-heading"><div><p class="eyebrow">CÁLCULO POLIMÓRFICO</p><h2>Calculadora</h2><p>Selecciona un objeto guardado y consulta sus medidas.</p></div></div>
+          <div class="calculator-grid"><section class="calculator-controls"><label class="select-label" for="calculator-select">Figura de la colección</label><select id="calculator-select" class="select-control"></select><p class="helper-text">Los valores se calculan en Python con la clase correspondiente.</p><button id="calculate-selected" class="button button-primary" type="button">Calcular figura <span aria-hidden="true">→</span></button><p id="calculator-error" class="form-feedback" role="status"></p></section><section id="calculator-result" class="calculator-result"><p class="eyebrow">RESULTADO</p><h3>Listo para calcular</h3><p>El área superficial y el volumen aparecerán aquí.</p></section></div>
+          <div id="calculator-stage-slot" class="stage-slot"></div>
+        </section>
 
-          <section class="panel preview-panel">
-            <div class="preview-copy">
-              <p class="eyebrow">VISTA GEOMÉTRICA</p>
-              <h2 id="preview-title">Selecciona una figura</h2>
-              <p id="preview-description">La representación se actualiza al elegir un sólido de la colección.</p>
-            </div>
-            <div class="canvas-wrap"><canvas id="shape-canvas" aria-label="Representación gráfica de la figura seleccionada"></canvas></div>
-            <div class="axis-label" aria-hidden="true"><span>X</span><span>Y</span><span>Z</span></div>
-          </section>
-        </div>
-      </section>
-      <footer class="page-footer"><span>GEOMETRÍA · LAB</span><span>Área ∝ s² <i></i> Volumen ∝ s³</span></footer>
-    </main>
-    <script src="/app.js" defer></script>
+        <section id="view-scale" class="view" data-view="scale" hidden>
+          <div class="view-heading"><div><p class="eyebrow">TRANSFORMACIÓN GEOMÉTRICA</p><h2>Escalado dinámico</h2><p>El factor cambia la vista y las medidas calculadas, no el objeto original.</p></div></div>
+          <div class="scale-workspace"><section class="scale-controls-panel"><label class="select-label" for="scale-select">Figura que se va a escalar</label><select id="scale-select" class="select-control"></select><div class="scale-readout"><span>FACTOR</span><strong id="scale-value">× 1.00</strong></div><input id="scale-range" class="scale-range" type="range" min="0.1" max="3" step="0.1" value="1" aria-label="Factor de escala"><div class="scale-presets" role="group" aria-label="Factores frecuentes"><button type="button" data-scale-preset="0.5">0.5×</button><button type="button" class="selected" data-scale-preset="1">1×</button><button type="button" data-scale-preset="1.5">1.5×</button><button type="button" data-scale-preset="2">2×</button></div><label class="select-label custom-factor-label" for="scale-number">Factor personalizado</label><input id="scale-number" class="select-control" type="number" min="0.1" step="any" value="1" inputmode="decimal"><p id="scale-error" class="form-feedback" role="status"></p><button id="calculate-scale" class="button button-primary" type="button">Calcular y guardar <span aria-hidden="true">→</span></button></section><section class="comparison-panel"><div class="panel-heading"><div><p class="eyebrow">COMPARATIVA</p><h3 id="scale-figure-name">Selecciona una figura</h3></div><span class="scale-tag" id="scale-tag">× 1.00</span></div><div class="comparison-table"><div class="comparison-head"><span>MEDIDA</span><span>ORIGINAL</span><span>ESCALADA</span></div><div class="comparison-row"><b>Dimensiones</b><span id="dimensions-original">—</span><strong id="dimensions-scaled">—</strong></div><div class="comparison-row"><b>Área superficial</b><span id="area-original">—</span><strong id="area-scaled">—</strong></div><div class="comparison-row"><b>Volumen</b><span id="volume-original">—</span><strong id="volume-scaled">—</strong></div></div><p class="formula-note"><span>Área</span> A × s² <i></i> <span>Volumen</span> V × s³</p></section></div>
+          <div id="scale-stage-slot" class="stage-slot"></div>
+        </section>
+
+        <section id="view-history" class="view" data-view="history" hidden>
+          <div class="view-heading"><div><p class="eyebrow">REGISTRO DE SESIÓN</p><h2>Historial de cálculos</h2><p>Los cálculos se registran en el servidor mientras la aplicación está abierta.</p></div><button id="clear-history" class="button button-subtle" type="button">Limpiar historial</button></div>
+          <section class="history-panel"><div class="table-scroll"><table class="history-table"><thead><tr><th>FECHA Y HORA</th><th>FIGURA</th><th>DIMENSIONES</th><th>FACTOR</th><th>ÁREA SUPERFICIAL</th><th>VOLUMEN</th></tr></thead><tbody id="history-body"></tbody></table><div id="history-empty" class="empty-note" hidden>Aún no hay cálculos registrados.</div></div></section>
+        </section>
+
+        <section id="view-about" class="view" data-view="about" hidden>
+          <div class="view-heading"><div><p class="eyebrow">PROYECTO ACADÉMICO</p><h2>Acerca del proyecto</h2><p>Un laboratorio para explorar geometría tridimensional y diseño orientado a objetos.</p></div></div>
+          <section class="about-overview"><span class="about-mark">3D</span><div><p class="eyebrow">SISTEMA AVANZADO DE FIGURAS 3D</p><h3>Un mismo contrato. Tres sólidos. Cálculos especializados.</h3><p>La aplicación conserva el modelo matemático en Python. Una clase abstracta define el contrato de las figuras y cada subclase implementa sus propiedades y fórmulas. La interfaz web consume los resultados a través de una API local.</p></div></section>
+          <div class="concept-grid"><article class="concept-item"><span>01</span><h3>Abstracción</h3><p><code>Figura3D</code> define los métodos y dimensiones que debe ofrecer toda figura.</p></article><article class="concept-item"><span>02</span><h3>Herencia</h3><p><code>Cubo</code>, <code>Esfera</code> y <code>Cilindro</code> extienden el contrato común.</p></article><article class="concept-item"><span>03</span><h3>Polimorfismo</h3><p><code>obtener_resultados()</code> recorre la colección sin preguntar qué clase concreta procesa.</p></article><article class="concept-item"><span>04</span><h3>Escalado</h3><p>El área se multiplica por s² y el volumen por s³, sin modificar dimensiones ni crear instancias.</p></article></div>
+          <section class="formula-panel"><p class="eyebrow">FÓRMULAS DEL MODELO</p><div class="formula-grid"><div><b>Cubo</b><span>A = 6l²</span><span>V = l³</span></div><div><b>Esfera</b><span>A = 4πr²</span><span>V = ⁴⁄₃πr³</span></div><div><b>Cilindro</b><span>A = 2πr(r + h)</span><span>V = πr²h</span></div></div></section>
+        </section>
+
+        <footer class="app-footer"><span>GEOMETRÍA · LAB</span><span>Python calcula <i></i> Three.js visualiza</span></footer>
+      </main>
+    </div>
+
+    <script type="module" src="/app.js"></script>
   </body>
 </html>

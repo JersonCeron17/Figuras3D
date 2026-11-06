@@ -1,7 +1,9 @@
 """Servidor local y API para el Sistema Avanzado de Figuras 3D."""
 
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+from datetime import datetime
 import json
+from math import isfinite
 from pathlib import Path
 from threading import RLock
 from urllib.parse import parse_qs, urlparse
@@ -13,25 +15,73 @@ BASE_DIR = Path(__file__).parent
 STATIC_DIR = BASE_DIR / "static"
 FIGURAS: list[Figura3D] = [Cubo(3), Esfera(2), Cilindro(1.5, 4)]
 FIGURAS_LOCK = RLock()
+HISTORIAL: list[dict[str, object]] = []
 TIPOS_FIGURA = {"Cubo": Cubo, "Esfera": Esfera, "Cilindro": Cilindro}
+
+
+def validar_factor(factor_escala: object) -> float:
+    if isinstance(factor_escala, bool):
+        raise ValueError("El factor de escala debe ser un número igual o mayor que cero.")
+    try:
+        factor = float(factor_escala)
+    except (TypeError, ValueError, OverflowError) as error:
+        raise ValueError("El factor de escala debe ser un número igual o mayor que cero.") from error
+    if not isfinite(factor) or factor < 0:
+        raise ValueError("El factor de escala debe ser un número igual o mayor que cero.")
+    return factor
+
+
+def _crear_resultado(figura: Figura3D, factor_escala: float) -> dict[str, object]:
+    dimensiones = figura.dimensiones
+    area_original = figura.calcular_area_superficial()
+    volumen_original = figura.calcular_volumen()
+    area_escalada = figura.calcular_area_superficial(factor_escala)
+    volumen_escalado = figura.calcular_volumen(factor_escala)
+    valores = (area_original, volumen_original, area_escalada, volumen_escalado)
+    if not all(isfinite(valor) for valor in valores):
+        raise ValueError("El factor es demasiado grande para calcular un resultado válido.")
+    return {
+        "nombre": figura.nombre,
+        "tipo": figura.tipo,
+        "dibujar": figura.dibujar(),
+        "dimensiones": dimensiones,
+        "dimensiones_escaladas": {
+            nombre: valor * factor_escala for nombre, valor in dimensiones.items()
+        },
+        "factor": factor_escala,
+        "area_original": area_original,
+        "volumen_original": volumen_original,
+        "area_escalada": area_escalada,
+        "volumen_escalado": volumen_escalado,
+    }
 
 
 def obtener_resultados(factor_escala: float) -> list[dict[str, object]]:
     """Calcula las figuras sin consultar su tipo, usando la interfaz común."""
+    factor = validar_factor(factor_escala)
     with FIGURAS_LOCK:
-        return [
+        return [_crear_resultado(figura, factor) for figura in FIGURAS]
+
+
+def calcular_figura(indice: int, factor_escala: object) -> dict[str, object]:
+    factor = validar_factor(factor_escala)
+    with FIGURAS_LOCK:
+        if indice < 0 or indice >= len(FIGURAS):
+            raise ValueError("Selecciona una figura válida para calcular.")
+        resultado = _crear_resultado(FIGURAS[indice], factor)
+        HISTORIAL.insert(
+            0,
             {
-                "nombre": figura.nombre,
-                "tipo": figura.tipo,
-                "dibujar": figura.dibujar(),
-                "dimensiones": figura.dimensiones,
-                "area_original": figura.calcular_area_superficial(),
-                "volumen_original": figura.calcular_volumen(),
-                "area_escalada": figura.calcular_area_superficial(factor_escala),
-                "volumen_escalado": figura.calcular_volumen(factor_escala),
-            }
-            for figura in FIGURAS
-        ]
+                "tipo": resultado["tipo"],
+                "dimensiones": resultado["dimensiones"],
+                "area_superficial": resultado["area_escalada"],
+                "volumen": resultado["volumen_escalado"],
+                "factor": factor,
+                "fecha": datetime.now().astimezone().isoformat(timespec="seconds"),
+            },
+        )
+        del HISTORIAL[200:]
+        return {"indice": indice, **resultado}
 
 
 class Figura3DHandler(BaseHTTPRequestHandler):
@@ -71,6 +121,12 @@ class Figura3DHandler(BaseHTTPRequestHandler):
             self._enviar_json(200, {"figuras": figuras})
             return
 
+        if ruta.path == "/api/historial":
+            with FIGURAS_LOCK:
+                historial = list(HISTORIAL)
+            self._enviar_json(200, {"historial": historial})
+            return
+
         if ruta.path == "/api/resultados":
             try:
                 valores = parse_qs(ruta.query).get("factor", ["1"])
@@ -85,7 +141,7 @@ class Figura3DHandler(BaseHTTPRequestHandler):
         if ruta.path == "/" or ruta.path == "/index.html":
             self._enviar_archivo("index.html")
             return
-        if ruta.path in ("/styles.css", "/app.js"):
+        if ruta.path in ("/styles.css", "/app.js", "/three-stage.js"):
             self._enviar_archivo(ruta.path.lstrip("/"))
             return
         self._enviar_json(404, {"error": "No se encontró el recurso solicitado."})
@@ -107,6 +163,19 @@ class Figura3DHandler(BaseHTTPRequestHandler):
 
     def do_POST(self) -> None:
         if urlparse(self.path).path != "/api/figuras":
+            ruta = urlparse(self.path).path
+            if ruta == "/api/calcular":
+                try:
+                    datos = self._leer_json()
+                    indice = datos.get("indice")
+                    if isinstance(indice, bool) or not isinstance(indice, int):
+                        raise ValueError("Selecciona una figura válida para calcular.")
+                    resultado = calcular_figura(indice, datos.get("factor", 1))
+                    self._enviar_json(200, {"resultado": resultado})
+                except (ValueError, TypeError, OverflowError, json.JSONDecodeError, UnicodeDecodeError) as error:
+                    mensaje = str(error) or "Revisa los datos del cálculo."
+                    self._enviar_json(400, {"error": mensaje})
+                return
             self._enviar_json(404, {"error": "No se encontró el recurso solicitado."})
             return
         try:
@@ -137,7 +206,13 @@ class Figura3DHandler(BaseHTTPRequestHandler):
             self._enviar_json(400, {"error": mensaje})
 
     def do_DELETE(self) -> None:
-        if urlparse(self.path).path != "/api/figuras":
+        ruta = urlparse(self.path).path
+        if ruta == "/api/historial":
+            with FIGURAS_LOCK:
+                HISTORIAL.clear()
+            self._enviar_json(200, {"historial": []})
+            return
+        if ruta != "/api/figuras":
             self._enviar_json(404, {"error": "No se encontró el recurso solicitado."})
             return
         with FIGURAS_LOCK:
