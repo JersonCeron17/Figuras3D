@@ -52,10 +52,7 @@ class Figura3D(ABC):
     def calcular_volumen(self, factor_escala: float = 1.0) -> float:
         raise NotImplementedError
 
-        def mostrar_resumen(figura: Figura3D) -> str:
-    # Devuelve el nombre y las dimensiones de la figura.
-    return figura.dibujar()
-
+# Clase encargada de representar un cubo y calcular su area y volumen
 
 class Cubo(Figura3D):
     nombre = "Cubo"
